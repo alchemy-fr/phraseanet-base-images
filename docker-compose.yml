@@ -1,0 +1,7 @@
+services:
+  phraseanet-php:
+    build:
+      context: .
+      target: phraseanet-php
+    image: local/phraseanet-php:7.0.33-fpm-bullseye
+
