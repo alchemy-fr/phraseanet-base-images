@@ -8,13 +8,13 @@ FROM debian:bullseye-slim as phraseanet-php
 
 # prevent Debian's PHP packages from being installed
 # https://github.com/docker-library/php/pull/542
-RUN set -eux; \
-	{ \
-		echo 'Package: php*'; \
-		echo 'Pin: release *'; \
-		echo 'Pin-Priority: -1'; \
-	} > /etc/apt/preferences.d/no-debian-php
-
+#RUN set -eux; \
+#	{ \
+#		echo 'Package: php*'; \
+#		echo 'Pin: release *'; \
+#		echo 'Pin-Priority: -1'; \
+#	} > /etc/apt/preferences.d/no-debian-php
+#
 # dependencies required for running "phpize"
 # (see persistent deps below)
 ENV PHPIZE_DEPS \
@@ -28,6 +28,61 @@ ENV PHPIZE_DEPS \
 		pkg-config \
 		re2c
 
+ENV PHRASEANET_DEPS \
+                wget \
+                automake \
+                git \
+                ghostscript \
+                gpac \
+                imagemagick \
+                inkscape \
+                libfreetype6-dev \
+                libmagickwand-dev \
+                libmcrypt-dev \
+                libpng-dev \
+                librabbitmq-dev \
+                libssl-dev \
+                libxslt-dev \
+                libzmq3-dev \
+                libtool \
+                locales \
+                gettext \
+                mcrypt \
+                unoconv \
+                unzip \
+                poppler-utils \
+                libreoffice-base-core \
+                libreoffice-impress \
+                libreoffice-calc \
+                libreoffice-math \
+                libreoffice-writer \
+                libde265-dev \
+                libopenjp2-7-dev \
+                librsvg2-dev \
+                libwebp-dev \
+                yasm \
+                libvorbis-dev \
+                texi2html \
+                nasm \
+                zlib1g-dev \
+                libx264-dev \
+                libopus-dev \
+                libvpx-dev \
+                libmp3lame-dev \
+                libogg-dev \
+                libopencore-amrnb-dev \
+                libopencore-amrwb-dev \
+                libx11-dev \
+                libswscale-dev \
+                libpostproc-dev \
+                libxvidcore-dev \
+                libtheora-dev \
+                libgsm1-dev \
+                libfreetype6-dev \
+                libldap2-dev \
+                libdc1394-dev \
+                nano
+
 # persistent / runtime deps
 RUN set -eux; \
 	apt-get update; \
@@ -36,8 +91,48 @@ RUN set -eux; \
 		ca-certificates \
 		curl \
 		xz-utils \
+                $PHRASEANET_DEPS \
 	; \
 	rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+        mkdir /tmp/icu \
+        && cd /tmp/icu \
+        && wget https://github.com/unicode-org/icu/releases/download/release-57-1/icu4c-57_1-src.tgz \
+        && tar -zxf icu4c-57_1-src.tgz \
+        && cd icu/source \
+        && ./configure \
+        && make \
+        && make install
+
+RUN set -eux; \
+    mkdir /tmp/libjq \
+    && git clone https://github.com/stedolan/jq.git /tmp/libjq \
+    && cd /tmp/libjq \
+    && git checkout fd9da6647c0fa619f03464fe37a4a10b70147e73 \
+    && git submodule update --init \
+    && autoreconf -fi \
+    && ./configure --with-oniguruma=builtin --disable-maintainer-mode \
+    && make -j8 \
+    && make check \
+    && make install
+
+RUN set -eux; \
+    mkdir /tmp/libheif \
+    && git clone https://github.com/strukturag/libheif.git /tmp/libheif \
+    && cd /tmp/libheif \
+    && git checkout v1.13.0 \
+    && ./autogen.sh \
+    && ./configure \
+    && make \
+    && make install
+
+RUN echo "BUILDING AND INSTALLING IMAGEMAGICK" \
+    && git clone https://github.com/ImageMagick/ImageMagick.git /tmp/ImageMagick \
+    && cd /tmp/ImageMagick \
+    && git checkout 7.1.0-39 \
+    && ./configure \
+    && make \
+    && make install 
 
 ENV PHP_INI_DIR /usr/local/etc/php
 RUN set -eux; \
@@ -226,6 +321,93 @@ COPY docker-php-ext-* docker-php-entrypoint /usr/local/bin/
 # sodium was built as a shared module (so that it can be replaced later if so desired), so let's enable it too (https://github.com/docker-library/php/issues/598)
 # RUN docker-php-ext-enable sodium
 
+RUN echo "PHRASEANET : BUILDING PHP PECL EXTENTIONS" \
+    ldconfig 
+RUN docker-php-ext-configure gd 
+RUN docker-php-ext-install -j$(nproc) gd
+RUN docker-php-ext-configure ldap --with-libdir=lib/x86_64-linux-gnu/
+RUN docker-php-ext-install -j$(nproc) ldap
+RUN docker-php-ext-install intl
+RUN docker-php-ext-install zip 
+RUN docker-php-ext-install exif 
+RUN docker-php-ext-install iconv 
+RUN docker-php-ext-install mbstring 
+RUN docker-php-ext-install pcntl 
+RUN docker-php-ext-install sockets 
+RUN docker-php-ext-install xsl 
+RUN docker-php-ext-install pdo_mysql 
+RUN docker-php-ext-install gettext 
+RUN docker-php-ext-install bcmath 
+RUN docker-php-ext-install mcrypt
+ 
+# --- extension jq - sources _must_ be in /usr/src/php/ext/ for the docker-php-ext-install script to find it
+
+RUN  mkdir -p /usr/src/php/ext/ \
+    && git clone --depth=1 https://github.com/kjdev/php-ext-jq.git /usr/src/php/ext/php-ext-jq \
+    && docker-php-ext-install php-ext-jq
+
+# --- end of extension jq
+
+RUN pecl install \
+        redis-5.3.7 \
+        amqp-1.9.3 \
+        zmq-beta \
+        imagick-beta \
+        xdebug-2.6.1 \
+    && docker-php-ext-enable redis amqp zmq imagick opcache \
+    && pecl clear-cache \
+    && docker-php-source delete
+
+RUN echo "PHRASEANET : INSTALLING NEWRELIC EXTENTION" \
+    && echo 'deb http://apt.newrelic.com/debian/ newrelic non-free' | tee /etc/apt/sources.list.d/newrelic.list \
+    && curl -o- https://download.newrelic.com/548C16BF.gpg | apt-key add - \
+    && apt-get update \ 
+    && apt-get install -y newrelic-php5 \ 
+    && NR_INSTALL_SILENT=1 newrelic-install install \
+    && touch /etc/newrelic/newrelic.cfg
+
+RUN echo "PHRASEANET : FINALIZING BUILD AND CLEANING" \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists \
+    && mkdir /entrypoint /var/alchemy \
+    && useradd -u 1000 app \
+    && mkdir -p /home/app/.composer \
+    && chown -R app: /home/app /var/alchemy
+
+ENV XDEBUG_ENABLED=0
+ENV FFMPEG_VERSION=4.2.2
+
+RUN echo "PHRASEANET : BUILDING AND INSTALLING FFMPEG" \
+    && mkdir /tmp/ffmpeg \
+    && curl -s https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.bz2 | tar jxf - -C /tmp/ffmpeg \
+    && ( \
+        cd /tmp/ffmpeg/ffmpeg-${FFMPEG_VERSION} \
+        && ./configure \
+            --enable-gpl \
+            --enable-nonfree \
+            --enable-libgsm \
+            --enable-libmp3lame \
+            --enable-libtheora \
+            --enable-libvorbis \
+            --enable-libvpx \
+            --enable-libfreetype \
+            --enable-libopus \
+            --enable-libx264 \
+            --enable-libxvid \
+            --enable-zlib \
+            --enable-postproc \
+            --enable-swscale \
+            --enable-pthreads \
+            --enable-libdc1394 \
+            --enable-version3 \
+            --enable-libopencore-amrnb \
+            --enable-libopencore-amrwb \
+        && make \
+        && make install \
+        && make distclean \
+    )
+    #&& rm -rf /tmp/ffmpeg
+
 ENTRYPOINT ["docker-php-entrypoint"]
 WORKDIR /var/www/html
 
@@ -247,7 +429,7 @@ RUN set -eux; \
 	{ \
 		echo '[global]'; \
 		echo 'error_log = /proc/self/fd/2'; \
-		echo; echo '; https://github.com/docker-library/php/pull/725#issuecomment-443540114'; echo 'log_limit = 8192'; \
+#		echo; echo '; https://github.com/docker-library/php/pull/725#issuecomment-443540114'; echo 'log_limit = 8192'; \
 		echo; \
 		echo '[www]'; \
 		echo '; php-fpm closes STDOUT on startup, so sending logs to /proc/self/fd/1 does not work.'; \
@@ -258,7 +440,7 @@ RUN set -eux; \
 		echo; \
 		echo '; Ensure worker stdout and stderr are sent to the main error log.'; \
 		echo 'catch_workers_output = yes'; \
-		echo 'decorate_workers_output = no'; \
+#		echo 'decorate_workers_output = no'; \
 	} | tee php-fpm.d/docker.conf; \
 	{ \
 		echo '[global]'; \
