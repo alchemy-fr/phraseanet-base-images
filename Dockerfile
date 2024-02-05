@@ -354,7 +354,7 @@ RUN pecl install \
         zmq-beta \
         imagick-beta \
         xdebug-2.6.1 \
-    && docker-php-ext-enable redis amqp zmq imagick opcache \
+    && docker-php-ext-enable redis.so amqp.so zmq.so imagick.so \
     && pecl clear-cache \
     && docker-php-source delete
 
@@ -365,14 +365,6 @@ RUN echo "PHRASEANET : INSTALLING NEWRELIC EXTENTION" \
     && apt-get install -y newrelic-php5 \ 
     && NR_INSTALL_SILENT=1 newrelic-install install \
     && touch /etc/newrelic/newrelic.cfg
-
-RUN echo "PHRASEANET : FINALIZING BUILD AND CLEANING" \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists \
-    && mkdir /entrypoint /var/alchemy \
-    && useradd -u 1000 app \
-    && mkdir -p /home/app/.composer \
-    && chown -R app: /home/app /var/alchemy
 
 ENV XDEBUG_ENABLED=0
 ENV FFMPEG_VERSION=4.2.2
@@ -406,7 +398,15 @@ RUN echo "PHRASEANET : BUILDING AND INSTALLING FFMPEG" \
         && make install \
         && make distclean \
     )
-    #&& rm -rf /tmp/ffmpeg
+
+RUN echo "PHRASEANET : FINALIZING BUILD AND CLEANING" \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists \
+    && rm -rf /tmp/* \
+    && mkdir /entrypoint /var/alchemy \
+    && useradd -u 1000 app \
+    && mkdir -p /home/app/.composer \
+    && chown -R app: /home/app /var/alchemy
 
 ENTRYPOINT ["docker-php-entrypoint"]
 WORKDIR /var/www/html
