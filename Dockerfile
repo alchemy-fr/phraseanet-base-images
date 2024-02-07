@@ -371,7 +371,6 @@ RUN echo "PHRASEANET : BUILDING AND INSTALLING FDKFAAC" \
     && cd /tmp \
     && git clone https://github.com/mstorsjo/fdk-aac.git \
     && cd fdk-aac \
-    && make \
     && autoreconf -fiv \
     && ./configure \
     && make -j8 \
