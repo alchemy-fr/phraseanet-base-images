@@ -366,6 +366,18 @@ RUN echo "PHRASEANET : INSTALLING NEWRELIC EXTENTION" \
     && NR_INSTALL_SILENT=1 newrelic-install install \
     && touch /etc/newrelic/newrelic.cfg
 
+
+RUN echo "PHRASEANET : BUILDING AND INSTALLING FDKFAAC" \
+    && cd /tmp \
+    && git clone https://github.com/mstorsjo/fdk-aac.git \
+    && cd fdk-aac \
+    && make \
+    && autoreconf -fiv \
+    && ./configure \
+    && make -j8 \
+    && make install \
+    && make distclean
+
 ENV XDEBUG_ENABLED=0
 ENV FFMPEG_VERSION=4.2.2
 
@@ -377,6 +389,8 @@ RUN echo "PHRASEANET : BUILDING AND INSTALLING FFMPEG" \
         && ./configure \
             --enable-gpl \
             --enable-nonfree \
+            --enable-libfdk-aac \
+            --enable-libfdk_aac \
             --enable-libgsm \
             --enable-libmp3lame \
             --enable-libtheora \
