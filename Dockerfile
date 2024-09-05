@@ -93,6 +93,14 @@ ENV PHRASEANET_DEPS \
 # persistent / runtime deps
 
 RUN set -eux; \
+        echo "deb http://archive.debian.org/debian stretch main non-free" > /etc/apt/sources.list.d/archive-debian.list \
+        && apt-get update \
+        && apt-get install -y --no-install-recommends ufraw \
+        && rm -fr /etc/apt/sources.list.d/archive-debian.list \
+        && apt-get clean \
+        && rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
         echo "deb http://deb.debian.org/debian bullseye-backports main" > /etc/apt/sources.list.d/backport.list \
 	&& apt-get update; \
 	apt-get install -y --no-install-recommends \
