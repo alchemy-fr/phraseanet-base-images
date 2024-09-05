@@ -24,6 +24,7 @@ ENV PHPIZE_DEPS \
 		g++ \
 		gcc \
 		libc-dev \
+                cmake \
 		make \
 		pkg-config \
 		re2c
@@ -48,7 +49,6 @@ ENV PHRASEANET_DEPS \
                 mcrypt \
                 unoconv \
                 unzip \
-                poppler-utils \
                 libreoffice-base-core \
                 libreoffice-impress \
                 libreoffice-calc \
@@ -79,11 +79,22 @@ ENV PHRASEANET_DEPS \
                 libfreetype6-dev \
                 libldap2-dev \
                 libdc1394-dev \
-                nano
+                nano \
+                libfontconfig-dev \
+                libnss3-dev \
+                libgpgmepp-dev \
+                qt6-base-dev \
+                qtbase5-dev \
+                libnss3-dev \
+                libgpgmepp-dev \
+                libcairo2-dev \ 
+                libboost-dev
 
 # persistent / runtime deps
+
 RUN set -eux; \
-	apt-get update; \
+        echo "deb http://deb.debian.org/debian bullseye-backports main" > /etc/apt/sources.list.d/backport.list \
+	&& apt-get update; \
 	apt-get install -y --no-install-recommends \
 		$PHPIZE_DEPS \
 		ca-certificates \
@@ -92,6 +103,20 @@ RUN set -eux; \
                 $PHRASEANET_DEPS \
 	; \
 	rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+       mkdir /tmp/poppler \
+       && cd /tmp/poppler \
+       && wget https://poppler.freedesktop.org/poppler-23.12.0.tar.xz \
+       && tar -xvf poppler-23.12.0.tar.xz \
+       && cd poppler-23.12.0 \
+       && mkdir build \
+       && cd build \
+       && git clone git://git.freedesktop.org/git/poppler/test \
+       && cmake -DENABLE_LIBCURL=OFF -DENABLE_GPGME=OFF -DTESTDATADIR=./test -DCMAKE_INSTALL_MANDIR:PATH=/usr/local/share/man .. \
+       && make \
+       && make install
+
 RUN set -eux; \
         mkdir /tmp/icu \
         && cd /tmp/icu \
