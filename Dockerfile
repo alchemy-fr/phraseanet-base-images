@@ -112,7 +112,7 @@ RUN set -eux; \
        && cd poppler-23.12.0 \
        && mkdir build \
        && cd build \
-       && git clone git://git.freedesktop.org/git/poppler/test \
+       && git clone https://gitlab.freedesktop.org/poppler/test.git \
        && cmake -DENABLE_LIBCURL=OFF -DENABLE_GPGME=OFF -DTESTDATADIR=./test -DCMAKE_INSTALL_MANDIR:PATH=/usr/local/share/man .. \
        && make \
        && make install
