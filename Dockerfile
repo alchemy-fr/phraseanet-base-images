@@ -33,8 +33,6 @@ ENV PHRASEANET_DEPS \
                 automake \
                 git \
                 ghostscript \
-                gpac \
-                imagemagick \
                 inkscape \
                 libfreetype6-dev \
                 libmagickwand-dev \
@@ -413,6 +411,7 @@ RUN echo "PHRASEANET : BUILDING AND INSTALLING FFMPEG" \
     )
 
 RUN echo "PHRASEANET : FINALIZING BUILD AND CLEANING" \
+    && apt-get remove autoconf dpkg-dev g++ gcc libc-dev pkg-config re2c wget automake -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists \
     && rm -rf /tmp/* \
