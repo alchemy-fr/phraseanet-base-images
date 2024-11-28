@@ -88,7 +88,8 @@ ENV PHRASEANET_DEPS \
                 libnss3-dev \
                 libgpgmepp-dev \
                 libcairo2-dev \ 
-                libboost-dev
+                libboost-dev \
+		ufraw
 
 # persistent / runtime deps
 
