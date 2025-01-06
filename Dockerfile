@@ -98,6 +98,7 @@ ENV PHRASEANET_DEPS \
 RUN echo "deb http://archive.debian.org/debian stretch main non-free" > /etc/apt/sources.list.d/archive-debian.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends ufraw \
+    && apt-get install -y --no-install-recommends gpac \
     && rm -fr /etc/apt/sources.list.d/archive-debian.list \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
