@@ -393,10 +393,9 @@ RUN echo "PHRASEANET : INSTALLING NEWRELIC EXTENTION" \
     && echo 'deb http://apt.newrelic.com/debian/ newrelic non-free' | tee /etc/apt/sources.list.d/newrelic.list \
     && curl -o- https://download.newrelic.com/548C16BF.gpg | apt-key add - \
     && apt-get update \ 
-    && apt-get install -y newrelic-php5 \ 
+    && apt-get install -y newrelic-daemon=10.21.0.11 newrelic-php5-common=10.21.0.11 newrelic-php5=10.21.0.11 \ 
     && NR_INSTALL_SILENT=1 newrelic-install install \
     && touch /etc/newrelic/newrelic.cfg
-
 
 RUN echo "PHRASEANET : BUILDING AND INSTALLING FDKFAAC" \
     && cd /tmp \
