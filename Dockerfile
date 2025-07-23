@@ -104,13 +104,13 @@ RUN echo "deb http://archive.debian.org/debian stretch main non-free" > /etc/apt
     && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
-        echo "deb http://deb.debian.org/debian bullseye-backports main" > /etc/apt/sources.list.d/backport.list \
+        echo "deb http://archive.debian.org/debian bullseye-backports main" > /etc/apt/sources.list.d/backport.list \
 	&& apt-get update; \
 	apt-get install -y --no-install-recommends \
 		$PHPIZE_DEPS \
                 $PHRASEANET_DEPS \
 	; \
-	rm -rf /var/lib/apt/lists/*
+	rm -rf /var/lib/apt/lists/* /etc/apt/sources.list.d/backport.list
 
 RUN set -eux; \
        mkdir /tmp/poppler \
