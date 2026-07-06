@@ -405,6 +405,8 @@ RUN echo "PHRASEANET : BUILDING AND INSTALLING FDKFAAC" \
     && ./configure \
     && make -j8 \
     && make install \
+    && echo "/usr/local/lib" > /etc/ld.so.conf.d/local.conf \
+    && ldconfig \
     && make distclean
 
 ENV XDEBUG_ENABLED=0
