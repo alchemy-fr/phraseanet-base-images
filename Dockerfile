@@ -6,6 +6,12 @@
 
 FROM debian:bullseye-slim as phraseanet-php
 
+# Debian Bullseye is archived.
+# Use the Debian archive and disable repository expiration checks.
+RUN echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check-valid-until \
+    && sed -i 's|deb.debian.org/debian|archive.debian.org/debian|g' /etc/apt/sources.list \
+    && sed -i 's|security.debian.org/debian-security|archive.debian.org/debian-security|g' /etc/apt/sources.list
+
 # prevent Debian's PHP packages from being installed
 # https://github.com/docker-library/php/pull/542
 #RUN set -eux; \
@@ -87,7 +93,7 @@ ENV PHRASEANET_DEPS \
                 qtbase5-dev \
                 libnss3-dev \
                 libgpgmepp-dev \
-                libcairo2-dev \ 
+                libcairo2-dev \
                 libboost-dev \
 		ca-certificates \
 		curl \
@@ -192,7 +198,6 @@ ENV PHP_ASC_URL=
 ENV PHP_SHA256="ab8c5be6e32b1f8d032909dedaaaa4bbb1a209e519abb01a52ce3914f9a13d96"
 
 RUN set -eux; \
-	\
 	savedAptMark="$(apt-mark showmanual)"; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends gnupg; \
@@ -225,7 +230,6 @@ RUN set -eux; \
 COPY docker-php-source /usr/local/bin/
 
 RUN set -eux; \
-	\
 	savedAptMark="$(apt-mark showmanual)"; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends \
@@ -244,7 +248,6 @@ RUN set -eux; \
 		CFLAGS="$PHP_CFLAGS" \
 		CPPFLAGS="$PHP_CPPFLAGS" \
 		LDFLAGS="$PHP_LDFLAGS" \
-# https://github.com/php/php-src/blob/d6299206dd828382753453befd1b915491b741c6/configure.ac#L1496-L1511
 		PHP_BUILD_PROVIDER='https://github.com/docker-library/php' \
 		PHP_UNAME='Linux - Docker' \
 	; \
@@ -252,7 +255,6 @@ RUN set -eux; \
 	cd /usr/src/php; \
 	gnuArch="$(dpkg-architecture --query DEB_BUILD_GNU_TYPE)"; \
 	debMultiarch="$(dpkg-architecture --query DEB_BUILD_MULTIARCH)"; \
-# https://bugs.php.net/bug.php?id=74125
 	if [ ! -d /usr/include/curl ]; then \
 		ln -sT "/usr/include/$debMultiarch/curl" /usr/local/include/curl; \
 	fi; \
@@ -260,49 +262,24 @@ RUN set -eux; \
 		--build="$gnuArch" \
 		--with-config-file-path="$PHP_INI_DIR" \
 		--with-config-file-scan-dir="$PHP_INI_DIR/conf.d" \
-		\
-# make sure invalid --configure-flags are fatal errors instead of just warnings
 		--enable-option-checking=fatal \
-		\
-# https://github.com/docker-library/php/issues/439
 		--with-mhash \
-		\
-# https://github.com/docker-library/php/issues/822
 		--with-pic \
-		\
-# --enable-ftp is included here for compatibility with existing versions. ftp_ssl_connect() needed ftp to be compiled statically before PHP 7.0 (see https://github.com/docker-library/php/issues/236).
 		--enable-ftp \
-# --enable-mbstring is included here because otherwise there's no way to get pecl to use it properly (see https://github.com/docker-library/php/issues/195)
 		--enable-mbstring \
-# --enable-mysqlnd is included here because it's harder to compile after the fact than extensions are (since it's a plugin for several extensions, not an extension in itself)
 		--enable-mysqlnd \
-# https://wiki.php.net/rfc/argon2_password_hash
-#		--with-password-argon2 \
-# https://wiki.php.net/rfc/libsodium
-#		--with-sodium=shared \
-# always build against system sqlite3 (https://github.com/php/php-src/commit/6083a387a81dbbd66d6316a3a12a63f06d5f7109)
 		--with-pdo-sqlite=/usr \
 		--with-sqlite3=/usr \
-		\
 		--with-curl \
 		--with-iconv \
 		--with-openssl \
 		--with-readline \
 		--with-zlib \
-		\
-# https://github.com/bwoebi/phpdbg-docs/issues/1#issuecomment-163872806 ("phpdbg is primarily a CLI debugger, and is not suitable for debugging an fpm stack.")
 		--disable-phpdbg \
-		\
-# in PHP 7.4+, the pecl/pear installers are officially deprecated (requiring an explicit "--with-pear")
 		--with-pear \
-		\
-# bundled pcre does not support JIT on s390x
-# https://manpages.debian.org/bullseye/libpcre3-dev/pcrejit.3.en.html#AVAILABILITY_OF_JIT_SUPPORT
 		$(test "$gnuArch" = 's390x-linux-gnu' && echo '--without-pcre-jit') \
 		--with-libdir="lib/$debMultiarch" \
-		\
 		--disable-cgi \
-		\
 		--enable-fpm \
 		--with-fpm-user=www-data \
 		--with-fpm-group=www-data \
@@ -320,13 +297,11 @@ RUN set -eux; \
 	; \
 	make clean; \
 	\
-# https://github.com/docker-library/php/issues/692 (copy default example "php.ini" files somewhere easily discoverable)
 	cp -v php.ini-* "$PHP_INI_DIR/"; \
 	\
 	cd /; \
 	docker-php-source delete; \
 	\
-# reset apt-mark's "manual" list so that "purge --auto-remove" will remove all build dependencies
 	apt-mark auto '.*' > /dev/null; \
 	[ -z "$savedAptMark" ] || apt-mark manual $savedAptMark; \
 	find /usr/local -type f -executable -exec ldd '{}' ';' \
@@ -340,11 +315,9 @@ RUN set -eux; \
 	apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
 	rm -rf /var/lib/apt/lists/*; \
 	\
-# update pecl channel definitions https://github.com/docker-library/php/issues/443
 	pecl update-channels; \
 	rm -rf /tmp/pear ~/.pearrc; \
 	\
-# smoke test
 	php --version
 
 COPY docker-php-ext-* docker-php-entrypoint /usr/local/bin/
@@ -392,8 +365,8 @@ RUN pecl install \
 RUN echo "PHRASEANET : INSTALLING NEWRELIC EXTENTION" \
     && echo 'deb http://apt.newrelic.com/debian/ newrelic non-free' | tee /etc/apt/sources.list.d/newrelic.list \
     && curl -o- https://download.newrelic.com/548C16BF.gpg | apt-key add - \
-    && apt-get update \ 
-    && apt-get install -y newrelic-daemon=10.21.0.11 newrelic-php5-common=10.21.0.11 newrelic-php5=10.21.0.11 \ 
+    && apt-get update \
+    && apt-get install -y newrelic-daemon=10.21.0.11 newrelic-php5-common=10.21.0.11 newrelic-php5=10.21.0.11 \
     && NR_INSTALL_SILENT=1 newrelic-install install \
     && touch /etc/newrelic/newrelic.cfg
 
@@ -460,11 +433,9 @@ WORKDIR /var/www/html
 RUN set -eux; \
 	cd /usr/local/etc; \
 	if [ -d php-fpm.d ]; then \
-		# for some reason, upstream's php-fpm.conf.default has "include=NONE/etc/php-fpm.d/*.conf"
 		sed 's!=NONE/!=!g' php-fpm.conf.default | tee php-fpm.conf > /dev/null; \
 		cp php-fpm.d/www.conf.default php-fpm.d/www.conf; \
 	else \
-		# PHP 5.x doesn't use "include=" by default, so we'll create our own simple config that mimics PHP 7+ for consistency
 		mkdir php-fpm.d; \
 		cp php-fpm.conf.default php-fpm.d/www.conf; \
 		{ \
@@ -475,7 +446,6 @@ RUN set -eux; \
 	{ \
 		echo '[global]'; \
 		echo 'error_log = /proc/self/fd/2'; \
-#		echo; echo '; https://github.com/docker-library/php/pull/725#issuecomment-443540114'; echo 'log_limit = 8192'; \
 		echo; \
 		echo '[www]'; \
 		echo '; php-fpm closes STDOUT on startup, so sending logs to /proc/self/fd/1 does not work.'; \
@@ -486,7 +456,6 @@ RUN set -eux; \
 		echo; \
 		echo '; Ensure worker stdout and stderr are sent to the main error log.'; \
 		echo 'catch_workers_output = yes'; \
-#		echo 'decorate_workers_output = no'; \
 	} | tee php-fpm.d/docker.conf; \
 	{ \
 		echo '[global]'; \
@@ -502,7 +471,7 @@ RUN set -eux; \
 	} > "$PHP_INI_DIR/conf.d/docker-fpm.ini"
 
 # Override stop signal to stop process gracefully
-# https://github.com/php/php-src/blob/17baa87faddc2550def3ae7314236826bc1b1398/sapi/fpm/php-fpm.7.in#L163
+# https://github.com/php/php-src/blob/17baa87faddc2550def3ae7314236826bc1b139c2/sapi/php-fpm.7.in
 STOPSIGNAL SIGQUIT
 
 EXPOSE 9000
