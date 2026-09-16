@@ -95,21 +95,33 @@ ENV PHRASEANET_DEPS \
 
 # persistent / runtime deps
 
-RUN echo "deb http://archive.debian.org/debian stretch main non-free" > /etc/apt/sources.list.d/archive-debian.list \
-    && apt-get update \
+###
+# FIX Outdated Debian Repositories
+###
+RUN echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260831T000000Z/ bullseye main contrib non-free" > /etc/apt/sources.list  \
+ && echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260831T000000Z/ bullseye-updates main contrib non-free" >> /etc/apt/sources.list \
+ && echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260831T000000Z/ bullseye-security main contrib non-free" >> /etc/apt/sources.list \
+ && echo "deb http://archive.debian.org/debian bullseye-backports main" >> /etc/apt/sources.list.d/backport.list \
+ && echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/00-no-check-valid-until.conf \
+ && apt-get -o Acquire::Check-Valid-Until=false update
+
+
+RUN echo "deb http://archive.debian.org/debian stretch main non-free" > /etc/apt/sources.list.d/archive-debian.list  \
+    && apt-get -o Acquire::Check-Valid-Until=false update \
     && apt-get install -y --no-install-recommends ufraw \
     && apt-get install -y --no-install-recommends gpac \
     && rm -fr /etc/apt/sources.list.d/archive-debian.list \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+RUN cat /etc/apt/sources.list
+
 RUN set -eux; \
-        echo "deb http://archive.debian.org/debian bullseye-backports main" > /etc/apt/sources.list.d/backport.list \
-	&& apt-get update; \
-	apt-get install -y --no-install-recommends \
+	apt-get -o Acquire::Check-Valid-Until=false update \
+	&& apt-get install -y --no-install-recommends \
 		$PHPIZE_DEPS \
                 $PHRASEANET_DEPS \
-	; \
+	;
 	rm -rf /var/lib/apt/lists/* /etc/apt/sources.list.d/backport.list
 
 RUN set -eux; \
