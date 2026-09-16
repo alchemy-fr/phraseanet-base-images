@@ -121,7 +121,7 @@ RUN set -eux; \
 	&& apt-get install -y --no-install-recommends \
 		$PHPIZE_DEPS \
                 $PHRASEANET_DEPS \
-	;
+	; \
 	rm -rf /var/lib/apt/lists/* /etc/apt/sources.list.d/backport.list
 
 RUN set -eux; \
