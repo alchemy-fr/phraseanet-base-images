@@ -235,6 +235,7 @@ RUN set -eux; \
 	apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 
 COPY docker-php-source /usr/local/bin/
+COPY php-7.0.33-cve-2026-109618-109619.patch /usr/local/src/php-7.0.33-cve-2026-109618-109619.patch
 
 RUN set -eux; \
 	\
@@ -262,6 +263,9 @@ RUN set -eux; \
 	; \
 	docker-php-source extract; \
 	cd /usr/src/php; \
+	echo "92d10fe00da2d6e2d2948a3c70945bdbef28f65dea3bc5f8b472df2f23a14257 */usr/local/src/php-7.0.33-cve-2026-109618-109619.patch" | sha256sum -c -; \
+	git apply --check /usr/local/src/php-7.0.33-cve-2026-109618-109619.patch; \
+	git apply /usr/local/src/php-7.0.33-cve-2026-109618-109619.patch; \
 	gnuArch="$(dpkg-architecture --query DEB_BUILD_GNU_TYPE)"; \
 	debMultiarch="$(dpkg-architecture --query DEB_BUILD_MULTIARCH)"; \
 # https://bugs.php.net/bug.php?id=74125
