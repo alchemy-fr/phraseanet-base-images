@@ -103,6 +103,7 @@ RUN echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/2
  && echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260831T000000Z/ bullseye-security main contrib non-free" >> /etc/apt/sources.list \
  && echo "deb http://archive.debian.org/debian bullseye-backports main" >> /etc/apt/sources.list.d/backport.list \
  && echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/00-no-check-valid-until.conf \
+ && echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries \
  && apt-get -o Acquire::Check-Valid-Until=false update
 
 
