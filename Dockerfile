@@ -419,7 +419,6 @@ RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o /tmp/redis-5.3.7.
     && extension_dir="$(php-config --extension-dir)" \
     && test "$(php -n -d "zend_extension=${extension_dir}/xdebug.so" -r 'echo phpversion("xdebug");')" = "2.6.1" \
     && rm -f /tmp/redis-5.3.7.tgz /tmp/amqp-1.9.3.tgz /tmp/zmq-1.1.3.tgz /tmp/imagick-3.8.1.tgz /tmp/xdebug-2.6.1.tgz \
-    && pecl clear-cache \
     && docker-php-source delete
 
 RUN echo "PHRASEANET : INSTALLING NEWRELIC EXTENTION" \
