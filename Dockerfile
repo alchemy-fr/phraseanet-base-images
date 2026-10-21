@@ -396,17 +396,29 @@ RUN  mkdir -p /usr/src/php/ext/ \
 
 # --- end of extension jq
 
-RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o /tmp/zmq-1.1.3.tgz https://pecl.php.net/get/zmq-1.1.3.tgz \
+RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o /tmp/redis-5.3.7.tgz https://pecl.php.net/get/redis-5.3.7.tgz \
+    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o /tmp/amqp-1.9.3.tgz https://pecl.php.net/get/amqp-1.9.3.tgz \
+    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o /tmp/zmq-1.1.3.tgz https://pecl.php.net/get/zmq-1.1.3.tgz \
+    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o /tmp/imagick-3.8.1.tgz https://pecl.php.net/get/imagick-3.8.1.tgz \
+    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o /tmp/xdebug-2.6.1.tgz https://pecl.php.net/get/xdebug-2.6.1.tgz \
+    && echo "b958166ccda4f40bd17c6998f9e2239021ae644467cd8ad5c15def420aad65b0  /tmp/redis-5.3.7.tgz" | sha256sum -c - \
+    && echo "c79e52db33bf907dad7da8f350dbdf2937b0679a3dc44fb2a941efb6d4808da9  /tmp/amqp-1.9.3.tgz" | sha256sum -c - \
     && echo "c492375818bd51b355352798fb94f04d6828c6aeda41ba813849624af74144ce  /tmp/zmq-1.1.3.tgz" | sha256sum -c - \
+    && echo "3a3587c0a524c17d0dad9673a160b90cd776e836838474e173b549ed864352ee  /tmp/imagick-3.8.1.tgz" | sha256sum -c - \
+    && echo "dae691d6c052073b886e0c6e1306a707bca9fd18a1e3485384ef6c4aacf1bd77  /tmp/xdebug-2.6.1.tgz" | sha256sum -c - \
+    && printf '\n' | pecl install /tmp/redis-5.3.7.tgz \
+    && printf '\n' | pecl install /tmp/amqp-1.9.3.tgz \
     && printf '\n' | pecl install /tmp/zmq-1.1.3.tgz \
-    && rm -f /tmp/zmq-1.1.3.tgz \
-    && pecl install \
-        redis-5.3.7 \
-        amqp-1.9.3 \
-        imagick-beta \
-        xdebug-2.6.1 \
+    && printf '\n' | pecl install /tmp/imagick-3.8.1.tgz \
+    && printf '\n' | pecl install /tmp/xdebug-2.6.1.tgz \
     && docker-php-ext-enable redis.so amqp.so zmq.so imagick.so \
+    && test "$(php -r 'echo phpversion("redis");')" = "5.3.7" \
+    && test "$(php -r 'echo phpversion("amqp");')" = "1.9.3" \
     && test "$(php -r 'echo phpversion("zmq");')" = "1.1.3" \
+    && test "$(php -r 'echo phpversion("imagick");')" = "3.8.1" \
+    && extension_dir="$(php-config --extension-dir)" \
+    && test "$(php -n -d "zend_extension=${extension_dir}/xdebug.so" -r 'echo phpversion("xdebug");')" = "2.6.1" \
+    && rm -f /tmp/redis-5.3.7.tgz /tmp/amqp-1.9.3.tgz /tmp/zmq-1.1.3.tgz /tmp/imagick-3.8.1.tgz /tmp/xdebug-2.6.1.tgz \
     && pecl clear-cache \
     && docker-php-source delete
 
