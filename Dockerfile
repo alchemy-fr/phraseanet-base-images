@@ -103,6 +103,7 @@ RUN echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/2
  && echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260831T000000Z/ bullseye-security main contrib non-free" >> /etc/apt/sources.list \
  && echo "deb http://archive.debian.org/debian bullseye-backports main" >> /etc/apt/sources.list.d/backport.list \
  && echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/00-no-check-valid-until.conf \
+ && echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries \
  && apt-get -o Acquire::Check-Valid-Until=false update
 
 
@@ -395,21 +396,26 @@ RUN  mkdir -p /usr/src/php/ext/ \
 
 # --- end of extension jq
 
-RUN pecl install \
+RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o /tmp/zmq-1.1.3.tgz https://pecl.php.net/get/zmq-1.1.3.tgz \
+    && echo "c492375818bd51b355352798fb94f04d6828c6aeda41ba813849624af74144ce  /tmp/zmq-1.1.3.tgz" | sha256sum -c - \
+    && printf '\n' | pecl install /tmp/zmq-1.1.3.tgz \
+    && rm -f /tmp/zmq-1.1.3.tgz \
+    && pecl install \
         redis-5.3.7 \
         amqp-1.9.3 \
-        zmq-beta \
         imagick-beta \
         xdebug-2.6.1 \
     && docker-php-ext-enable redis.so amqp.so zmq.so imagick.so \
+    && test "$(php -r 'echo phpversion("zmq");')" = "1.1.3" \
     && pecl clear-cache \
     && docker-php-source delete
 
 RUN echo "PHRASEANET : INSTALLING NEWRELIC EXTENTION" \
-    && echo 'deb http://apt.newrelic.com/debian/ newrelic non-free' | tee /etc/apt/sources.list.d/newrelic.list \
-    && curl -o- https://download.newrelic.com/548C16BF.gpg | apt-key add - \
-    && apt-get update \ 
-    && apt-get install -y newrelic-daemon=10.21.0.11 newrelic-php5-common=10.21.0.11 newrelic-php5=10.21.0.11 \ 
+    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 https://download.newrelic.com/NEWRELIC_APT_2DAD550E.public \
+        | gpg --import --batch --no-default-keyring --keyring /usr/share/keyrings/download.newrelic.com-newrelic.gpg \
+    && echo 'deb [signed-by=/usr/share/keyrings/download.newrelic.com-newrelic.gpg] http://apt.newrelic.com/debian/ newrelic non-free' | tee /etc/apt/sources.list.d/newrelic.list \
+    && apt-get update \
+    && apt-get install -y newrelic-daemon=10.21.0.11 newrelic-php5-common=10.21.0.11 newrelic-php5=10.21.0.11 \
     && NR_INSTALL_SILENT=1 newrelic-install install \
     && touch /etc/newrelic/newrelic.cfg
 
@@ -417,6 +423,7 @@ RUN echo "PHRASEANET : BUILDING AND INSTALLING FDKFAAC" \
     && cd /tmp \
     && git clone https://github.com/mstorsjo/fdk-aac.git \
     && cd fdk-aac \
+    && git checkout aad34c033bd0b974d67f17f2bd9752a43f7674f5 \
     && autoreconf -fiv \
     && ./configure \
     && make -j8 \
@@ -430,7 +437,10 @@ ENV FFMPEG_VERSION=4.2.2
 
 RUN echo "PHRASEANET : BUILDING AND INSTALLING FFMPEG" \
     && mkdir /tmp/ffmpeg \
-    && curl -s https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.bz2 | tar jxf - -C /tmp/ffmpeg \
+    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o /tmp/ffmpeg.tar.bz2 https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.bz2 \
+    && echo "b620d187c26f76ca19e74210a0336c3b8380b97730df5cdf45f3e69e89000e5c  /tmp/ffmpeg.tar.bz2" | sha256sum -c - \
+    && tar jxf /tmp/ffmpeg.tar.bz2 -C /tmp/ffmpeg \
+    && rm -f /tmp/ffmpeg.tar.bz2 \
     && ( \
         cd /tmp/ffmpeg/ffmpeg-${FFMPEG_VERSION} \
         && ./configure \
