@@ -4,7 +4,7 @@
 # PLEASE DO NOT EDIT IT DIRECTLY.
 #
 
-FROM debian:bullseye-slim as phraseanet-php
+FROM debian:trixie-slim AS phraseanet-php
 
 # prevent Debian's PHP packages from being installed
 # https://github.com/docker-library/php/pull/542
@@ -35,19 +35,19 @@ ENV PHRASEANET_DEPS \
                 git \
                 ghostscript \
                 inkscape \
-                libfreetype6-dev \
+                libfreetype-dev \
                 libmagickwand-dev \
                 libmcrypt-dev \
                 libpng-dev \
                 librabbitmq-dev \
                 libssl-dev \
-                libxslt-dev \
+                libxslt1-dev \
                 libzmq3-dev \
                 libtool \
                 locales \
                 gettext \
                 mcrypt \
-                unoconv \
+                python3-uno \
                 unzip \
                 libreoffice-base-core \
                 libreoffice-impress \
@@ -76,7 +76,7 @@ ENV PHRASEANET_DEPS \
                 libxvidcore-dev \
                 libtheora-dev \
                 libgsm1-dev \
-                libfreetype6-dev \
+                libfreetype-dev \
                 libldap2-dev \
                 libdc1394-dev \
                 nano \
@@ -89,41 +89,46 @@ ENV PHRASEANET_DEPS \
                 libgpgmepp-dev \
                 libcairo2-dev \ 
                 libboost-dev \
+                dcraw \
+                libraw-dev \
 		ca-certificates \
 		curl \
 		xz-utils
 
 # persistent / runtime deps
 
-###
-# FIX Outdated Debian Repositories
-###
-RUN echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260831T000000Z/ bullseye main contrib non-free" > /etc/apt/sources.list  \
- && echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260831T000000Z/ bullseye-updates main contrib non-free" >> /etc/apt/sources.list \
- && echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260831T000000Z/ bullseye-security main contrib non-free" >> /etc/apt/sources.list \
- && echo "deb http://archive.debian.org/debian bullseye-backports main" >> /etc/apt/sources.list.d/backport.list \
- && echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/00-no-check-valid-until.conf \
- && echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries \
- && apt-get -o Acquire::Check-Valid-Until=false update
-
-
-RUN echo "deb http://archive.debian.org/debian stretch main non-free" > /etc/apt/sources.list.d/archive-debian.list  \
-    && apt-get -o Acquire::Check-Valid-Until=false update \
-    && apt-get install -y --no-install-recommends ufraw \
-    && apt-get install -y --no-install-recommends gpac \
-    && rm -fr /etc/apt/sources.list.d/archive-debian.list \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN cat /etc/apt/sources.list
+RUN echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries
 
 RUN set -eux; \
-	apt-get -o Acquire::Check-Valid-Until=false update \
+	apt-get update \
 	&& apt-get install -y --no-install-recommends \
 		$PHPIZE_DEPS \
                 $PHRASEANET_DEPS \
 	; \
-	rm -rf /var/lib/apt/lists/* /etc/apt/sources.list.d/backport.list
+	rm -rf /var/lib/apt/lists/*
+
+# unoconv and gpac (MP4Box) are no longer packaged in Debian trixie
+# python3-setuptools provides the distutils module unoconv imports (removed from Python 3.12+)
+RUN set -eux; \
+    apt-get update \
+    && apt-get install -y --no-install-recommends python3-setuptools \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o /usr/local/bin/unoconv https://raw.githubusercontent.com/unoconv/unoconv/0.9.0/unoconv \
+    && echo "f5c33a280c3050025322935687bb0b7453dc1c205c0bbe2318ff55c735b007c0  /usr/local/bin/unoconv" | sha256sum -c - \
+    && sed -i '1s|.*|#!/usr/bin/python3|' /usr/local/bin/unoconv \
+    && chmod +x /usr/local/bin/unoconv \
+    && unoconv --version
+
+RUN set -eux; \
+    git clone https://github.com/gpac/gpac.git /tmp/gpac \
+    && cd /tmp/gpac \
+    && git checkout v2.4.0 \
+    && ./configure --use-zlib=system \
+    && make -j"$(nproc)" \
+    && make install \
+    && ldconfig \
+    && MP4Box -version \
+    && rm -rf /tmp/gpac
 
 RUN set -eux; \
        mkdir /tmp/poppler \
@@ -155,7 +160,8 @@ RUN set -eux; \
     && git checkout fd9da6647c0fa619f03464fe37a4a10b70147e73 \
     && git submodule update --init \
     && autoreconf -fi \
-    && ./configure --with-oniguruma=builtin --disable-maintainer-mode \
+# gcc 14 turns implicit declarations into errors, which breaks this old jq's configure checks (strptime, ...)
+    && ./configure --with-oniguruma=builtin --disable-maintainer-mode CFLAGS="-O2 -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion -Wno-error=incompatible-pointer-types" \
     && make -j8 \
     && make check \
     && make install
@@ -167,13 +173,16 @@ RUN set -eux; \
     && git checkout v1.13.0 \
     && ./autogen.sh \
     && ./configure \
-    && make \
+# configure appends -Werror, which fails on gcc 14's new warnings: override the flags at make time
+    && make CFLAGS="-O2" CXXFLAGS="-O2" \
     && make install
 
 RUN echo "BUILDING AND INSTALLING IMAGEMAGICK" \
     && git clone https://github.com/ImageMagick/ImageMagick.git /tmp/ImageMagick \
     && cd /tmp/ImageMagick \
     && git checkout 7.1.0-39 \
+# LIBRAW_OPIONS_NO_MEMERR_CALLBACK was removed in libraw 0.21 (trixie)
+    && sed -i 's/LIBRAW_OPIONS_NO_MEMERR_CALLBACK |//' coders/dng.c \
     && ./configure \
     && make \
     && make install 
@@ -193,7 +202,8 @@ RUN set -eux; \
 # Enable linker optimization (this sorts the hash buckets to improve cache locality, and is non-default)
 # https://github.com/docker-library/php/issues/272
 # -D_LARGEFILE_SOURCE and -D_FILE_OFFSET_BITS=64 (https://www.php.net/manual/en/intro.filesystem.php)
-ENV PHP_CFLAGS="-fstack-protector-strong -fpic -fpie -O2 -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64"
+# PHP 7.0 predates gcc 14, which turns these legacy warnings into errors
+ENV PHP_CFLAGS="-fstack-protector-strong -fpic -fpie -O2 -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion -Wno-error=incompatible-pointer-types"
 ENV PHP_CPPFLAGS="$PHP_CFLAGS"
 ENV PHP_LDFLAGS="-Wl,-O1 -pie"
 
@@ -267,6 +277,9 @@ RUN set -eux; \
 	echo "92d10fe00da2d6e2d2948a3c70945bdbef28f65dea3bc5f8b472df2f23a14257 */usr/local/src/php-7.0.33-cve-2026-109618-109619.patch" | sha256sum -c -; \
 	git apply --check /usr/local/src/php-7.0.33-cve-2026-109618-109619.patch; \
 	git apply /usr/local/src/php-7.0.33-cve-2026-109618-109619.patch; \
+# RSA_SSLV23_PADDING was removed in OpenSSL 3 (trixie); guard it like PHP 8.1 does
+	sed -i 's/^\(\s*REGISTER_LONG_CONSTANT("OPENSSL_SSLV23_PADDING".*\)$/#ifdef RSA_SSLV23_PADDING\n\1\n#endif/' ext/openssl/openssl.c; \
+	grep -B1 -A1 'OPENSSL_SSLV23_PADDING' ext/openssl/openssl.c; \
 	gnuArch="$(dpkg-architecture --query DEB_BUILD_GNU_TYPE)"; \
 	debMultiarch="$(dpkg-architecture --query DEB_BUILD_MULTIARCH)"; \
 # https://bugs.php.net/bug.php?id=74125
@@ -314,7 +327,7 @@ RUN set -eux; \
 		--with-pear \
 		\
 # bundled pcre does not support JIT on s390x
-# https://manpages.debian.org/bullseye/libpcre3-dev/pcrejit.3.en.html#AVAILABILITY_OF_JIT_SUPPORT
+# https://manpages.debian.org/trixie/libpcre3-dev/pcrejit.3.en.html#AVAILABILITY_OF_JIT_SUPPORT
 		$(test "$gnuArch" = 's390x-linux-gnu' && echo '--without-pcre-jit') \
 		--with-libdir="lib/$debMultiarch" \
 		\
@@ -350,7 +363,7 @@ RUN set -eux; \
 		| awk '/=>/ { so = $(NF-1); if (index(so, "/usr/local/") == 1) { next }; gsub("^/(usr/)?", "", so); print so }' \
 		| sort -u \
 		| xargs -r dpkg-query --search \
-		| cut -d: -f1 \
+		| awk 'sub(":$", "", $1) { print $1 }' \
 		| sort -u \
 		| xargs -r apt-mark manual \
 	; \
@@ -423,7 +436,8 @@ RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o /tmp/redis-5.3.7.
 
 RUN echo "PHRASEANET : INSTALLING NEWRELIC EXTENTION" \
     && curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 https://download.newrelic.com/NEWRELIC_APT_2DAD550E.public \
-        | gpg --import --batch --no-default-keyring --keyring /usr/share/keyrings/download.newrelic.com-newrelic.gpg \
+# trixie's apt verifies with sqv, which cannot read gpg keybox files: store the key dearmored
+        | gpg --dearmor -o /usr/share/keyrings/download.newrelic.com-newrelic.gpg \
     && echo 'deb [signed-by=/usr/share/keyrings/download.newrelic.com-newrelic.gpg] http://apt.newrelic.com/debian/ newrelic non-free' | tee /etc/apt/sources.list.d/newrelic.list \
     && apt-get update \
     && apt-get install -y newrelic-daemon=10.21.0.11 newrelic-php5-common=10.21.0.11 newrelic-php5=10.21.0.11 \
@@ -446,6 +460,9 @@ RUN echo "PHRASEANET : BUILDING AND INSTALLING FDKFAAC" \
 ENV XDEBUG_ENABLED=0
 ENV FFMPEG_VERSION=4.2.2
 
+# upstream FFmpeg effadce6: fixes assembling with binutils >= 2.41 (trixie)
+COPY ffmpeg-4.2.2-binutils-2.41.patch /usr/local/src/ffmpeg-4.2.2-binutils-2.41.patch
+
 RUN echo "PHRASEANET : BUILDING AND INSTALLING FFMPEG" \
     && mkdir /tmp/ffmpeg \
     && curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o /tmp/ffmpeg.tar.bz2 https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.bz2 \
@@ -454,6 +471,8 @@ RUN echo "PHRASEANET : BUILDING AND INSTALLING FFMPEG" \
     && rm -f /tmp/ffmpeg.tar.bz2 \
     && ( \
         cd /tmp/ffmpeg/ffmpeg-${FFMPEG_VERSION} \
+        && echo "8fad5f253bcda7a17523dbfcbfcfd60b3db23783dcdb65998005cddc7c7776c3  /usr/local/src/ffmpeg-4.2.2-binutils-2.41.patch" | sha256sum -c - \
+        && patch -p1 < /usr/local/src/ffmpeg-4.2.2-binutils-2.41.patch \
         && ./configure \
             --enable-gpl \
             --enable-nonfree \
