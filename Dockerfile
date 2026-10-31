@@ -123,6 +123,10 @@ RUN set -eux; \
     git clone https://github.com/gpac/gpac.git /tmp/gpac \
     && cd /tmp/gpac \
     && git checkout v2.4.0 \
+# php-mp4box calls "MP4Box -inter 0.5" (0.5 ms), which GPAC >= 2.x truncates to 0 ms and rejects with "Bad Parameter":
+# keep microsecond precision in gf_isom_make_interleave, as GPAC 0.5 did
+    && sed -i -e 's/f.num = (s32) (TimeInSec \* 1000);/f.num = (s32) (TimeInSec * 1000000);/' -e 's/^\tf.den = 1000;$/\tf.den = 1000000;/' src/isomedia/isom_write.c \
+    && grep -q 'TimeInSec \* 1000000' src/isomedia/isom_write.c \
     && ./configure --use-zlib=system \
     && make -j"$(nproc)" \
     && make install \
@@ -505,6 +509,9 @@ RUN echo "PHRASEANET : FINALIZING BUILD AND CLEANING" \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists \
     && rm -rf /tmp/* \
+# existing Phraseanet configurations point to the Debian paths of the former unoconv/gpac packages
+    && ln -s /usr/local/bin/unoconv /usr/bin/unoconv \
+    && ln -s /usr/local/bin/MP4Box /usr/bin/MP4Box \
     && mkdir /entrypoint /var/alchemy \
     && useradd -u 1000 app \
     && mkdir -p /home/app/.composer \
