@@ -505,6 +505,9 @@ RUN echo "PHRASEANET : FINALIZING BUILD AND CLEANING" \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists \
     && rm -rf /tmp/* \
+# existing Phraseanet configurations point to the Debian paths of the former unoconv/gpac packages
+    && ln -s /usr/local/bin/unoconv /usr/bin/unoconv \
+    && ln -s /usr/local/bin/MP4Box /usr/bin/MP4Box \
     && mkdir /entrypoint /var/alchemy \
     && useradd -u 1000 app \
     && mkdir -p /home/app/.composer \
