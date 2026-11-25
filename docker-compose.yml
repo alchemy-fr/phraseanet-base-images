@@ -1,7 +1,6 @@
 services:
-  phraseanet-php:
+  phraseanet-base:
     build:
       context: .
-      target: phraseanet-php
-    image: local/phraseanet-php:7.0.33-fpm-trixie
-
+      target: phraseanet-base
+    image: local/phraseanet-base:php8.5-fpm-trixie
